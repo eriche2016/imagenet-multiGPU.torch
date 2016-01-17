@@ -15,6 +15,7 @@ paths.dofile('util.lua')
 ------------------------------------------
 
 -- a cache file of the training metadata (if doesnt exist, will be created)
+-- 训练样本集的metadata的存放路径
 local trainCache = paths.concat(opt.cache, 'trainCache.t7')
 local testCache = paths.concat(opt.cache, 'testCache.t7')
 local meanstdCache = paths.concat(opt.cache, 'meanstdCache.t7')
@@ -24,18 +25,23 @@ if not os.execute('cd ' .. opt.data) then
     error(("could not chdir to '%s'"):format(opt.data))
 end
 
+-- 设定要处理的图片的loadSize和sampleSize
 local loadSize   = {3, opt.imageSize, opt.imageSize}
 local sampleSize = {3, opt.cropSize, opt.cropSize}
 
 
 local function loadImage(path)
+   -- 要load进来处理的图像的深度是3通道（RGB或者YUV）， 数据类型（tensor）是float类型
    local input = image.load(path, 3, 'float')
    -- find the smaller dimension, and resize it to loadSize (while keeping aspect ratio)
    if input:size(3) < input:size(2) then
+       -- 默认插值办法是采用双线性， 最终， 最终scale函数，原图像变成了 W=loadSize[2], H=loadSize[3] * input:size(2) / input:size(3)的图像
+       -- 相当于保持原来的长的对应的load_size，拉长短的对应的loadsize
       input = image.scale(input, loadSize[2], loadSize[3] * input:size(2) / input:size(3))
    else
       input = image.scale(input, loadSize[2] * input:size(3) / input:size(2), loadSize[3])
    end
+   -- 返回尺度变换后的图像
    return input
 end
 
@@ -48,38 +54,51 @@ local mean,std
 --]]
 
 -- function to load the image, jitter it appropriately (random crops etc.)
+-- 加载给定路径的图像， 并进行相应的crop处理
+-- 相当于从训练样本集中去钓处训练样本图片
 local trainHook = function(self, path)
    collectgarbage()
    local input = loadImage(path)
+   -- input的第维度是通道数，第二维度是高， 第三维度是宽
    local iW = input:size(3)
    local iH = input:size(2)
 
    -- do random crop
    local oW = sampleSize[3]
    local oH = sampleSize[2]
+   
    local h1 = math.ceil(torch.uniform(1e-2, iH-oH))
    local w1 = math.ceil(torch.uniform(1e-2, iW-oW))
+   -- 剪裁图像input， 剪裁的坐标是（x1=w1, y1=h1）, 和 （x2 = w1 + oW, y2 = h1 + oH）
    local out = image.crop(input, w1, h1, w1 + oW, h1 + oH)
+   -- 进行相关的断言以验证剪裁结果正确
    assert(out:size(3) == oW)
    assert(out:size(2) == oH)
    -- do hflip with probability 0.5
    if torch.uniform() > 0.5 then out = image.hflip(out) end
+ 
+   -- 对图像进行Z-Score 归一化 
    -- mean/std
    for i=1,3 do -- channels
       if mean then out[{{i},{},{}}]:add(-mean[i]) end
       if std then out[{{i},{},{}}]:div(std[i]) end
    end
+   -- 返回图像
    return out
 end
 
-if paths.filep(trainCache) then
+if paths.filep(trainCache) then 
+   -- 训练样本集的metadata文件存在， 则直接加载进来
    print('Loading train metadata from cache')
+   -- 将训练数据加载进内存中
    trainLoader = torch.load(trainCache)
+   -- 设值训练数据的采样函数
    trainLoader.sampleHookTrain = trainHook
    assert(trainLoader.paths[1] == paths.concat(opt.data, 'train'),
           'cached files dont have the same path as opt.data. Remove your cached files at: '
              .. trainCache .. ' and rerun the program')
 else
+   -- 训练样本集的metadata文件不存在， 则需要创建这个metadata
    print('Creating train metadata')
    trainLoader = dataLoader{
       paths = {paths.concat(opt.data, 'train')},
@@ -88,6 +107,7 @@ else
       split = 100,
       verbose = true
    }
+   -- 保存metadata
    torch.save(trainCache, trainLoader)
    trainLoader.sampleHookTrain = trainHook
 end
@@ -103,6 +123,7 @@ do
 end
 
 -- End of train loader section
+
 --------------------------------------------------------------------------------
 --[[
    Section 2: Create a test data loader (testLoader),
