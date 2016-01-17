@@ -99,9 +99,9 @@ function train()
       -- queue jobs to data-workers
       donkeys:addjob(   -- 加入线程队列所有子线程需要处理的工作列表中
          -- the job callback (runs in data-worker thread)
-         function()   --      
+         function()   -- 该callback函数返回的值会作为endcallback函数（由main thread执行）的参数      
             local inputs, labels = trainLoader:sample(opt.batchSize)
-            return inputs, labels
+            return inputs, labels  -- 会作为trainBatch的函数的参数
          end,
          -- the end callback (runs in the main thread)
          trainBatch
