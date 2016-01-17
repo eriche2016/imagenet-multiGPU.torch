@@ -41,11 +41,14 @@ end
 
 nClasses = nil
 classes = nil
+-- 训练数据工作
 -- 一般而言， addjob（callback, endcallback, args), 中的callback（args）会由整个threads queue 并行化， 以便并行处理，
 --  endcallback 是由main thread调用执行的。 
 donkeys:addjob(function() return trainLoader.classes end, function(c) classes = c end) -- addjob函数会将一些函数插入到job queue中， 一遍给所有的线程执行
 
+-- 对线程池中的线程队列等进行一次同步操作， 确保上述所有数据加载工作完全结束
 donkeys:synchronize()
+
 nClasses = #classes
 assert(nClasses, "Failed to get nClasses")
 assert(nClasses == opt.nClasses,
@@ -53,6 +56,7 @@ assert(nClasses == opt.nClasses,
 print('nClasses: ', nClasses)
 torch.save(paths.concat(opt.save, 'classes.t7'), classes)
 
+-- 测试数据工作
 nTest = 0
 donkeys:addjob(function() return testLoader:size() end, function(c) nTest = c end)
 donkeys:synchronize()
