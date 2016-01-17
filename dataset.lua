@@ -301,19 +301,26 @@ function dataset:size(class, list)
 end
 
 -- getByClass
+-- 根据class的类别选取随机选取该类训练样本的一个样本
 function dataset:getByClass(class)
+   -- index是classListSample[class]中的一个要被选择的随机样本的索引值
    local index = math.max(1, math.ceil(torch.uniform() * self.classListSample[class]:nElement()))
+   -- 获取被选中的该样本的虽在的路径
    local imgpath = ffi.string(torch.data(self.imagePath[self.classListSample[class][index]]))
+   --  返回该样本， 这里调用了加载该随机样本的函数：sampleHookTrain函数
    return self:sampleHookTrain(imgpath)
 end
 
 -- converts a table of samples (and corresponding labels) to a clean tensor
+-- 将table中的数据存放到一个大的tensor中， 方便处理
 local function tableToOutput(self, dataTable, scalarTable)
    local data, scalarLabels, labels
    local quantity = #scalarTable
    assert(dataTable[1]:dim() == 3)
+   -- data 存放着传入table的所有样本紧缩后的大的tensor空间
    data = torch.Tensor(quantity,
 		       self.sampleSize[1], self.sampleSize[2], self.sampleSize[3])
+   -- 数据标签存放在新的大的tensor中（size为quantity）
    scalarLabels = torch.LongTensor(quantity):fill(-1111)
    for i=1,#dataTable do
       data[i]:copy(dataTable[i])
@@ -327,12 +334,18 @@ function dataset:sample(quantity)
    assert(quantity)
    local dataTable = {}
    local scalarTable = {}
+   -- 随机采样quantity数目个样本
    for i=1,quantity do
+      -- 确定要选择样本的随机类别
       local class = torch.random(1, #self.classes)
+      -- 根据该随机类别， 选择该类别下的样本
       local out = self:getByClass(class)
+      -- 将该类别的一个随机样本存到数据table中
       table.insert(dataTable, out)
+      -- 存储该样本的类别型号到另一个table中
       table.insert(scalarTable, class)
    end
+   -- 
    local data, scalarLabels = tableToOutput(self, dataTable, scalarTable)
    return data, scalarLabels
 end
@@ -351,7 +364,11 @@ function dataset:get(i1, i2)
       table.insert(dataTable, out)
       table.insert(scalarTable, self.imageClass[indices[i]])
    end
+   -- 函数调用之后返回的数据和标签数据：
+   -- data：data = torch.Tensor(quantity,self.sampleSize[1], self.sampleSize[2], self.sampleSize[3])
+   -- scalarLablels: torch.LongTensor(quantity)
    local data, scalarLabels = tableToOutput(self, dataTable, scalarTable)
+   -- 返回batch大小为为quantity的数据和标签
    return data, scalarLabels
 end
 
