@@ -91,6 +91,7 @@ if paths.filep(trainCache) then
    -- 训练样本集的metadata文件存在， 则直接加载进来
    print('Loading train metadata from cache')
    -- 将训练数据加载进内存中
+   -- 注意trainLoader很重要！！
    trainLoader = torch.load(trainCache)
    -- 设值训练数据的采样函数
    trainLoader.sampleHookTrain = trainHook
