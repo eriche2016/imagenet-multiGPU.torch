@@ -95,11 +95,11 @@ function dataset:__init(...)
    if not self.sampleHookTest then self.sampleHookTest = self.defaultSampleHook end
 
    -- find class names
-   -- 类名
+   -- 类名，dataset自己具有的变量域
    self.classes = {}
    --相关类样本文件存放的地址
    local classPaths = {}
-   -- 是否强制制定类标签和类索引的映射关系。 例如制定dog类的索引对应3等。 
+   -- 是否强制制定类标签和类索引的映射关系。 例如制定的索引3对应dog类等。 
    if self.forceClasses then
       for k,v in pairs(self.forceClasses) do
          self.classes[k] = v
