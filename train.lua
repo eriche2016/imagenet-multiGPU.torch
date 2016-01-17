@@ -111,8 +111,10 @@ function train()
    donkeys:synchronize()
    -- 多个GPU的同步
    cutorch.synchronize()
-
-   top1_epoch = top1_epoch * 100 / (opt.batchSize * opt.epochSize)
+ 
+   -- 一个epoch平均的top1精度
+   top1_epoch = top1_epoch * 100 / (opt.batchSize * opt.epochSize)  
+   -- 平均一个batch的loss
    loss_epoch = loss_epoch / opt.epochSize
 
    trainLogger:add{
@@ -135,12 +137,14 @@ function train()
       for _,val in ipairs(list) do
             for name,field in pairs(val) do
                if torch.type(field) == 'cdata' then val[name] = nil end
+               -- 清除掉output和gradInput参数的内存空间
                if (name == 'output' or name == 'gradInput') then
                   val[name] = field.new()
                end
             end
       end
    end
+   
    sanitize(model)
    saveDataParallel(paths.concat(opt.save, 'model_' .. epoch .. '.t7'), model) -- defined in util.lua
    torch.save(paths.concat(opt.save, 'optimState_' .. epoch .. '.t7'), optimState)
@@ -157,6 +161,7 @@ local parameters, gradParameters = model:getParameters()
 
 -- 4. trainBatch - Used by train() to train a single batch after the data is loaded.
 function trainBatch(inputsCPU, labelsCPU)
+   -- 多个GPU同步
    cutorch.synchronize()
    collectgarbage()
    local dataLoadingTime = dataTimer:time().real
@@ -178,15 +183,19 @@ function trainBatch(inputsCPU, labelsCPU)
    optim.sgd(feval, parameters, optimState)
 
    -- DataParallelTable's syncParameters
+   -- 参数的同步
    model:apply(function(m) if m.syncParameters then m:syncParameters() end end)
-
+   
+   -- 多个GPU同步
    cutorch.synchronize()
    batchNumber = batchNumber + 1
+   -- 一个epoch的loss累加
    loss_epoch = loss_epoch + err
-   -- top-1 error
+   -- top-1 精度
    local top1 = 0
    do
       local _,prediction_sorted = outputs:float():sort(2, true) -- descending
+      -- 对该batch内的预测情况进行统计
       for i=1,opt.batchSize do
 	 if prediction_sorted[i][1] == labelsCPU[i] then
 	    top1_epoch = top1_epoch + 1;
@@ -195,7 +204,7 @@ function trainBatch(inputsCPU, labelsCPU)
       end
       top1 = top1 * 100 / opt.batchSize;
    end
-   -- Calculate top-1 error, and print information
+   -- Calculate top-1 accuracy, and print information
    print(('Epoch: [%d][%d/%d]\tTime %.3f Err %.4f Top1-%%: %.2f LR %.0e DataLoadingTime %.3f'):format(
           epoch, batchNumber, opt.epochSize, timer:time().real, err, top1,
           optimState.learningRate, dataLoadingTime))
