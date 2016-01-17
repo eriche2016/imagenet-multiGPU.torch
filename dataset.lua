@@ -9,20 +9,25 @@ require 'sys'
 require 'xlua'
 require 'image'
 
+-- dataLoader类
 local dataset = torch.class('dataLoader')
 
+-- 关于dataLoader类的参数检查函数， 以确定dataLoader类被正确使用
 local initcheck = argcheck{
    pack=true,
+   -- 帮助信息
    help=[[
      A dataset class for images in a flat folder structure (folder-name is class-name).
      Optimized for extremely large datasets (upwards of 14 million images).
      Tested only on Linux (as it uses command-line linux utilities to scale up)
 ]],
-   {check=function(paths)
+   -- 检查路径，注意paths是一个table of paths
+   {check=function(paths)  
        local out = true;
        for k,v in ipairs(paths) do
           if type(v) ~= 'string' then
              print('paths can only be of string input');
+             -- 一旦发现v不是字符串， 即设定out为false
              out = false
           end
        end
@@ -31,11 +36,11 @@ local initcheck = argcheck{
     name="paths",
     type="table",
     help="Multiple paths of directories with images"},
-
+    -- 检查对采样图片的size
    {name="sampleSize",
     type="table",
     help="a consistent sample size to resize the images"},
-
+   -- 训练样本和测试样本的划分比例
    {name="split",
     type="number",
     help="Percentage of split to go to Training"
@@ -55,7 +60,7 @@ local initcheck = argcheck{
     type="table",
     help="a size to load the images to, initially",
     opt = true},
-
+   -- 强制进行类标签和类索引的映射关系
    {name="forceClasses",
     type="table",
     help="If you want this loader to map certain classes to certain indices, "
@@ -78,27 +83,33 @@ local initcheck = argcheck{
 }
 
 function dataset:__init(...)
-
    -- argcheck
    local args =  initcheck(...)
    print(args)
+   -- 进行相关参数赋值
    for k,v in pairs(args) do self[k] = v end
-
+   -- self = {} 里面有相关参数的设置    
    if not self.loadSize then self.loadSize = self.sampleSize; end
 
    if not self.sampleHookTrain then self.sampleHookTrain = self.defaultSampleHook end
    if not self.sampleHookTest then self.sampleHookTest = self.defaultSampleHook end
 
    -- find class names
+   -- 类名
    self.classes = {}
+   --相关类样本文件存放的地址
    local classPaths = {}
+   -- 是否强制制定类标签和类索引的映射关系。 例如制定dog类的索引对应3等。 
    if self.forceClasses then
       for k,v in pairs(self.forceClasses) do
          self.classes[k] = v
+         -- 相关类图片存放的的路径
          classPaths[k] = {}
       end
    end
+   
    local function tableFind(t, o) for k,v in pairs(t) do if v == o then return k end end end
+   
    -- loop over each paths folder, get list of unique class names,
    -- also store the directory paths per class
    -- for each class,
@@ -117,7 +128,7 @@ function dataset:__init(...)
          end
       end
    end
-
+  
    self.classIndices = {}
    for k,v in ipairs(self.classes) do
       self.classIndices[v] = k
@@ -134,12 +145,13 @@ function dataset:__init(...)
    end
    ----------------------------------------------------------------------
    -- Options for the GNU find command
+   -- 支持的图片格式后缀
    local extensionList = {'jpg', 'png','JPG','PNG','JPEG', 'ppm', 'PPM', 'bmp', 'BMP'}
-   local findOptions = ' -iname "*.' .. extensionList[1] .. '"'
+   local findOptions = ' -iname "*.' .. extensionList[1] .. '"'  -- iname "*.jpg"
    for i=2,#extensionList do
       findOptions = findOptions .. ' -o -iname "*.' .. extensionList[i] .. '"'
    end
-
+   -- -iname "*.jpg" -o -iname "*.png" ..  
    -- find the image path names
    self.imagePath = torch.CharTensor()  -- path to each image in dataset
    self.imageClass = torch.LongTensor() -- class index of each image (class index in self.classes)
@@ -289,7 +301,7 @@ function dataset:__init(...)
 end
 
 -- size(), size(class)
-function dataset:size(class, list)
+function dataset:size(class, list)  -- 给定class的索引或者类名称， 返回该类具有的数据总数
    list = list or self.classList
    if not class then
       return self.numSamples
@@ -345,11 +357,14 @@ function dataset:sample(quantity)
       -- 存储该样本的类别型号到另一个table中
       table.insert(scalarTable, class)
    end
-   -- 
+    -- 函数调用之后返回的数据和标签数据：
+   -- data：data = torch.Tensor(quantity,self.sampleSize[1], self.sampleSize[2], self.sampleSize[3])
+   -- scalarLablels: torch.LongTensor(quantity)
    local data, scalarLabels = tableToOutput(self, dataTable, scalarTable)
    return data, scalarLabels
 end
 
+-- 获取索引范围在[i1, i2]之间的所有样本
 function dataset:get(i1, i2)
    local indices = torch.range(i1, i2);
    local quantity = i2 - i1 + 1;
