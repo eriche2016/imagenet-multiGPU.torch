@@ -94,7 +94,7 @@ function train()
    local tm = torch.Timer()
    top1_epoch = 0
    loss_epoch = 0
-   for i=1,opt.epochSize do
+   for i=1,opt.epochSize do  -- 一个epoch具有的batch个数
       -- queue jobs to data-workers
       donkeys:addjob(   -- 加入线程队列所有子线程需要处理的工作列表中
          -- the job callback (runs in data-worker thread)
