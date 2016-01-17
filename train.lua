@@ -69,6 +69,7 @@ local top1_epoch, loss_epoch
 
 -- 3. train - this function handles the high-level training loop,
 --            i.e. load data, train model, save model and state to disk
+-- 训练函数
 function train()
    print('==> doing epoch on training data:')
    print("==> online epoch # " .. epoch)
@@ -84,6 +85,7 @@ function train()
       }
    end
    batchNumber = 0
+   -- 进行多个GPU的同步工作
    cutorch.synchronize()
 
    -- set the dropouts to training mode
@@ -94,9 +96,9 @@ function train()
    loss_epoch = 0
    for i=1,opt.epochSize do
       -- queue jobs to data-workers
-      donkeys:addjob(
+      donkeys:addjob(   -- 加入线程队列所有子线程需要处理的工作列表中
          -- the job callback (runs in data-worker thread)
-         function()
+         function()   --      
             local inputs, labels = trainLoader:sample(opt.batchSize)
             return inputs, labels
          end,
@@ -104,8 +106,9 @@ function train()
          trainBatch
       )
    end
-
+   -- 线程池的同步
    donkeys:synchronize()
+   -- 多个GPU的同步
    cutorch.synchronize()
 
    top1_epoch = top1_epoch * 100 / (opt.batchSize * opt.epochSize)
