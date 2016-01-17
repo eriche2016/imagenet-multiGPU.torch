@@ -14,23 +14,24 @@ Threads.serialization('threads.sharedserialize')
 -- For the data-loading details, look at donkey.lua
 -------------------------------------------------------------------------------
 do -- start K datathreads (donkeys)
-   if opt.nDonkeys > 0 then
+   if opt.nDonkeys > 0 then  -- 开的线程个数， 用于并行load data
       local options = opt -- make an upvalue to serialize over to donkey threads
-      donkeys = Threads(
-         opt.nDonkeys,
-         function()
+      -- donkeys是管理者一组线程（在线程队列中）的线程池
+      donkeys = Threads(  
+         opt.nDonkeys,      -- 假设该脚本本身是主线程， 那么该函数或spawn nDonkeys个辅助线程， 或者子线程， 推入到thread队列中， 执行下面的f1, f2, ..的function list
+         function()          
             require 'torch'
          end,
-         function(idx)
+         function(idx)  -- idx是相关线程的线程号
             opt = options -- pass to all donkeys via upvalue
-            tid = idx
-            local seed = opt.manualSeed + idx
+            tid = idx 
+            local seed = opt.manualSeed + idx  -- 每个线程有自己的随机种子
             torch.manualSeed(seed)
             print(string.format('Starting donkey with id: %d seed: %d', tid, seed))
-            paths.dofile('donkey.lua')
+            paths.dofile('donkey.lua')  -- 没有子线程都会执行donkey.lua脚本
          end
       );
-   else -- single threaded data loading. useful for debugging
+   else -- single threaded data loading. useful for debugging， 单线程情况
       paths.dofile('donkey.lua')
       donkeys = {}
       function donkeys:addjob(f1, f2) f2(f1()) end
@@ -40,7 +41,10 @@ end
 
 nClasses = nil
 classes = nil
-donkeys:addjob(function() return trainLoader.classes end, function(c) classes = c end)
+-- 一般而言， addjob（callback, endcallback, args), 中的callback（args）会由整个threads queue 并行化， 以便并行处理，
+--  endcallback 是由main thread调用执行的。 
+donkeys:addjob(function() return trainLoader.classes end, function(c) classes = c end) -- addjob函数会将一些函数插入到job queue中， 一遍给所有的线程执行
+
 donkeys:synchronize()
 nClasses = #classes
 assert(nClasses, "Failed to get nClasses")
