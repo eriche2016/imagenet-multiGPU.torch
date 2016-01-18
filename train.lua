@@ -97,6 +97,8 @@ function train()
    -- 一次准备好了一个epoch的所有线程的工作列表
    for i=1,opt.epochSize do  -- 一个epoch具有的batch个数
       -- queue jobs to data-workers
+      -- 因为数据的加载可能需要占用很多时间，容易造成瓶颈， 所以这里开了几个线程实现并行的数据的运输
+      -- 方便主线程直接把data-workers准备好的数据直接运行
       donkeys:addjob(   -- 加入线程队列所有子线程需要处理的工作列表中
          -- the job callback (runs in data-worker thread)
          function()   -- 该callback函数返回的值会作为endcallback函数（由main thread执行）的参数      
