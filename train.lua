@@ -103,7 +103,7 @@ function train()
             local inputs, labels = trainLoader:sample(opt.batchSize)
             return inputs, labels  -- 会作为trainBatch的函数的参数
          end,
-         -- the end callback (runs in the main thread)
+         -- the end callback (runs in the main thread)，  该函数是主线程执行的，该函数会修改相关upvalue， 例如batchNumber等等 
          trainBatch
       )
    end
