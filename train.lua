@@ -103,7 +103,7 @@ function train()
          -- the job callback (runs in data-worker thread)
          function()   -- 该callback函数返回的值会作为endcallback函数（由main thread执行）的参数      
             local inputs, labels = trainLoader:sample(opt.batchSize)
-            return inputs, labels  -- 会作为trainBatch的函数的参数
+            return inputs, labels  -- 会作为trainBatch的函数的参数, 注意此时数据仍然在CPU中，在主线程中（trainBatch）会将其运载到GPU中
          end,
          -- the end callback (runs in the main thread)，  该函数是主线程执行的，该函数会修改相关upvalue， 例如batchNumber等等 
          trainBatch
