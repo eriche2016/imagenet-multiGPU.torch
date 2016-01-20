@@ -176,7 +176,9 @@ function trainBatch(inputsCPU, labelsCPU)
    local err, outputs
    feval = function(x)
       model:zeroGradParameters()
+      -- model是DataParallelTable， updateoutput本身就有cutorch.synchronize() 函数， 所以可以保证outputs是已经prepared的
       outputs = model:forward(inputs)
+      -- criterion是位于base GPU之中的
       err = criterion:forward(outputs, labels)
       local gradOutputs = criterion:backward(outputs, labels)
       model:backward(inputs, gradOutputs)
@@ -185,10 +187,10 @@ function trainBatch(inputsCPU, labelsCPU)
    optim.sgd(feval, parameters, optimState)
 
    -- DataParallelTable's syncParameters
-   -- 参数的同步
+   -- 参数的同步， 也就是将base GPU中的模型参数广播（复制）到其他辅助GPU中去
    model:apply(function(m) if m.syncParameters then m:syncParameters() end end)
    
-   -- 多个GPU同步
+   -- 多个GPU同步， 等待上述所有作业完成
    cutorch.synchronize()
    batchNumber = batchNumber + 1
    -- 一个epoch的loss累加
